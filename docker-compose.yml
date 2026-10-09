@@ -1,3 +1,16 @@
+# ALL-IN-ONE deployment (default). A single `docker compose up` brings up the
+# monitor PLUS a bundled Evolution API (with its own Postgres + Redis), already
+# wired together. The monitor auto-connects to Evolution over the internal
+# network and shows the WhatsApp pairing QR in its own UI — no separate Evolution
+# deploy, no manual URL/key configuration.
+#
+# Zero-config for local/LAN: boots with sensible defaults and no .env needed.
+# For PRODUCTION, override via environment / Coolify secrets (at minimum:
+# APP_ENV=production, ADMIN_PASSWORD_HASH, SESSION_SECRET, a strong
+# EVOLUTION_API_KEY and POSTGRES_PASSWORD, and OPENROUTER_MANAGEMENT_KEY).
+#
+# Monitor-only (no bundled Evolution): use docker-compose.monitor-only.yml.
+
 services:
   openrouter-credit-monitor:
     build:
@@ -5,31 +18,29 @@ services:
       dockerfile: backend/Dockerfile
     container_name: openrouter-credit-monitor
     restart: unless-stopped
-
-    # Secrets and config come from the per-section env files.
-    env_file:
-      - backend/.env
-      - frontend/.env
-
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: "8080"
+      ROOT_PATH: ${ROOT_PATH:-}
+      AUTH_ENABLED: ${AUTH_ENABLED:-false}
+      LAN_ONLY: ${LAN_ONLY:-false}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OPENROUTER_MANAGEMENT_KEY: ${OPENROUTER_MANAGEMENT_KEY:-}
+      # Evolution is auto-wired to the bundled service below.
+      EVOLUTION_API_URL: http://evolution-api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-local-dev-evolution-key}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-openrouter-monitor}
+      WHATSAPP_DESTINATION: ${WHATSAPP_DESTINATION:-}
+      DATABASE_URL: sqlite:////app/data/monitor.db
     volumes:
-      # Named volume: Docker initializes it from the image path (owned by the
-      # non-root appuser, uid 10001), so SQLite stays writable. A host bind
-      # mount (./data) would be root-owned and break writes under non-root.
       - monitor-data:/app/data
-
-    # No public host port in production — the Central/reverse proxy reaches this
-    # container over the shared Docker network. Use `expose`, not `ports`.
     expose:
       - "8080"
-
-    # For LOCAL development only, uncomment to reach it directly:
-    # ports:
-    #   - "8080:8080"
-    # And for local dev you may prefer a host bind mount instead of the named
-    # volume above (easier to inspect / back up the .db file):
-    #   volumes:
-    #     - ./data:/app/data
-
+    depends_on:
+      - evolution-api
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz', timeout=4).status==200 else 1)"]
       interval: 30s
@@ -37,12 +48,64 @@ services:
       retries: 3
       start_period: 10s
 
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution-api
+    restart: unless-stopped
+    environment:
+      SERVER_URL: http://evolution-api:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-local-dev-evolution-key}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD:-evolution_local_dev}@evolution-postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution-instances:/evolution/instances
+    expose:
+      - "8080"
+    # Optional: expose the Evolution manager on the LAN for debugging. The
+    # monitor does not need this — it reaches Evolution internally.
+    # ports:
+    #   - "8088:8080"
+    depends_on:
+      - evolution-postgres
+      - evolution-redis
+
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evolution_local_dev}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: evolution-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - evolution-redis:/data
+
 volumes:
   monitor-data:
-
-# If the Central/reverse proxy runs in its own compose project, attach this
-# service to that shared external network instead of the default one, e.g.:
-# networks:
-#   default:
-#     name: central-net
-#     external: true
+  evolution-instances:
+  evolution-postgres:
+  evolution-redis:

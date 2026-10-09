@@ -114,14 +114,24 @@ Open http://localhost:8080/ .
 
 ## 6. Run with Docker
 
+The default `docker-compose.yml` is **all-in-one**: a single command brings up
+the monitor **and a bundled Evolution API** (Postgres + Redis), wired together.
+The WhatsApp pairing QR shows up inside the monitor UI — no separate Evolution
+deploy. For local/LAN it needs no `.env`.
+
 ```bash
 # from project root (build context = root so both backend/ and frontend/ copy in)
 docker compose up --build -d
 docker compose logs -f
 ```
 
-The compose file uses `expose` (no host port). For direct local access,
-uncomment the `ports:` block in `docker-compose.yml`.
+Then open the monitor, go to **Chaves & integrações**, scan the QR with your
+phone, and add your destinations. See [docs/WHATSAPP.md](docs/WHATSAPP.md) for
+pairing, multiple targets (numbers/groups), and production hardening.
+
+To run the monitor **without** the bundled Evolution (e.g. behind the Central
+proxy, or pointing at an existing Evolution), use
+`docker compose -f docker-compose.monitor-only.yml up --build -d`.
 
 ## 7. Connecting to Evolution API
 
