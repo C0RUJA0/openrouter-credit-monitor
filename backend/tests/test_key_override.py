@@ -65,3 +65,42 @@ def test_dashboard_key_unset_reports_false(app_settings, session_factory):
     finally:
         s.close()
     assert ctx["openrouter_key_set"] is False
+
+
+def test_evolution_override_resolution_and_masking(app_settings, session_factory):
+    # env defaults from conftest; override url+key+dest via DB
+    s = session_factory()
+    try:
+        row = repo.get_settings(s)
+        row.evolution_api_url = "http://evo.db.local"
+        row.evolution_api_key = "evo-db-secret-9999"
+        row.evolution_instance = "db-inst"
+        row.whatsapp_destination = "5511888887777"
+        s.commit()
+        ctx = build_dashboard_context(s, app_settings, "csrf")
+    finally:
+        s.close()
+    # raw evolution key never exposed
+    assert "evo-db-secret-9999" not in str(ctx)
+    assert ctx["evolution_key_set"] is True
+    assert ctx["evolution_key_masked"].endswith("9999")
+    assert ctx["evolution_key_source"] == "UI"
+    assert ctx["evolution_url"] == "http://evo.db.local"
+    assert ctx["evolution_instance_value"] == "db-inst"
+
+
+def test_evolution_client_uses_db_override(app_settings, session_factory):
+    m = MonitorService(app_settings, session_factory)
+    s = session_factory()
+    try:
+        row = repo.get_settings(s)
+        row.evolution_api_url = "http://evo.db.local"
+        row.evolution_api_key = "k"
+        row.evolution_instance = "inst"
+        s.commit()
+        client = m._evolution_client(row)
+    finally:
+        s.close()
+    assert client is not None
+    assert client._base_url == "http://evo.db.local"
+    assert client._instance == "inst"

@@ -30,6 +30,12 @@ class Settings(Base):
     # design). When present it takes precedence over OPENROUTER_MANAGEMENT_KEY.
     # Never returned to the browser or logged; only a masked hint is shown.
     openrouter_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Optional UI-set Evolution API overrides (same deviation / handling as the
+    # OpenRouter key). Each takes precedence over its env var when present.
+    evolution_api_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    evolution_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    evolution_instance: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    whatsapp_destination: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

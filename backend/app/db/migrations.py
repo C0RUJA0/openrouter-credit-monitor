@@ -18,6 +18,10 @@ from app.db.models import Base, MonitorState, Settings
 _ADDED_COLUMNS = {
     "settings": {
         "openrouter_key": "VARCHAR(256)",
+        "evolution_api_url": "VARCHAR(512)",
+        "evolution_api_key": "VARCHAR(256)",
+        "evolution_instance": "VARCHAR(128)",
+        "whatsapp_destination": "VARCHAR(32)",
     },
 }
 

@@ -32,6 +32,16 @@ def _fmt_dt(dt) -> str:
     return dt.strftime("%d/%m/%Y %H:%M")
 
 
+def _gauge_pct(balance, threshold) -> int:
+    """Balance position on a 0..(2*threshold) meter, so the threshold sits at
+    the midpoint (50%). Clamped to 2..100. 0 when unknown."""
+    if balance is None or threshold is None or threshold <= 0:
+        return 0
+    scale = float(threshold) * 2
+    pct = float(balance) / scale * 100
+    return max(2, min(100, round(pct)))
+
+
 def _balance_status(state, threshold) -> str:
     if state.last_balance is None:
         return BalanceStatus.UNKNOWN
@@ -47,6 +57,12 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
 
     balance_status = _balance_status(state, settings_row.alert_threshold)
 
+    # Effective Evolution config: DB override wins over env, per field.
+    eff_url = settings_row.evolution_api_url or config.evolution_api_url
+    eff_evo_key = settings_row.evolution_api_key or config.evolution_api_key
+    eff_instance = settings_row.evolution_instance or config.evolution_instance
+    eff_destination = settings_row.whatsapp_destination or config.whatsapp_destination
+
     event_rows = [
         {
             "time": e.timestamp.strftime("%d/%m %H:%M"),
@@ -61,6 +77,8 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "app_title": config.app_title,
         "balance_display": format_usd(state.last_balance),
         "balance_status": balance_status,
+        "gauge_pct": _gauge_pct(state.last_balance, settings_row.alert_threshold),
+        "gauge_threshold_pct": 50,
         "threshold_display": format_usd(settings_row.alert_threshold),
         "threshold_input": f"{settings_row.alert_threshold:.2f}",
         "notifications_enabled": settings_row.notifications_enabled,
@@ -70,8 +88,15 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "last_check_at": _fmt_dt(state.last_check_at),
         "last_success_at": _fmt_dt(state.last_success_at),
         "last_alert_at": _fmt_dt(state.last_alert_at),
-        "whatsapp_instance": config.evolution_instance or "—",
-        "whatsapp_destination_masked": _mask_destination(config.whatsapp_destination),
+        "whatsapp_instance": eff_instance or "—",
+        "whatsapp_destination_masked": _mask_destination(eff_destination),
+        # Evolution config (effective = DB override or env), for the UI form.
+        "evolution_url": eff_url or "",
+        "evolution_instance_value": eff_instance or "",
+        "whatsapp_destination_value": eff_destination or "",
+        "evolution_key_set": bool(eff_evo_key),
+        "evolution_key_masked": _mask_secret(eff_evo_key),
+        "evolution_key_source": "UI" if settings_row.evolution_api_key else "env",
         # OpenRouter key: expose only whether it is set and a masked hint.
         # The effective key is the DB override if present, else the env key.
         "openrouter_key_set": bool(settings_row.openrouter_key or config.openrouter_management_key),

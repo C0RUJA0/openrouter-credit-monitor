@@ -80,21 +80,34 @@ class MonitorService:
             timeout=self._cfg.http_timeout,
         )
 
-    def _evolution_client(self) -> EvolutionClient | None:
+    def _effective_evolution(self, settings_row) -> dict:
+        """Resolve each Evolution field: DB override if present, else env."""
+        g = lambda name: getattr(settings_row, name, None)  # noqa: E731
+        return {
+            "url": g("evolution_api_url") or self._cfg.evolution_api_url,
+            "key": g("evolution_api_key") or self._cfg.evolution_api_key,
+            "instance": g("evolution_instance") or self._cfg.evolution_instance,
+            "destination": g("whatsapp_destination") or self._cfg.whatsapp_destination,
+        }
+
+    def _evolution_client(self, settings_row=None) -> EvolutionClient | None:
         if self._evolution is not None:
             return self._evolution
-        if not (
-            self._cfg.evolution_api_url
-            and self._cfg.evolution_api_key
-            and self._cfg.evolution_instance
-        ):
+        if settings_row is not None:
+            evo = self._effective_evolution(settings_row)
+            url, key, instance = evo["url"], evo["key"], evo["instance"]
+        else:
+            url = self._cfg.evolution_api_url
+            key = self._cfg.evolution_api_key
+            instance = self._cfg.evolution_instance
+        if not (url and key and instance):
             return None
-        return EvolutionClient(
-            self._cfg.evolution_api_url,
-            self._cfg.evolution_api_key,
-            self._cfg.evolution_instance,
-            timeout=self._cfg.http_timeout,
-        )
+        return EvolutionClient(url, key, instance, timeout=self._cfg.http_timeout)
+
+    def _effective_destination(self, settings_row=None) -> str | None:
+        if settings_row is not None:
+            return getattr(settings_row, "whatsapp_destination", None) or self._cfg.whatsapp_destination
+        return self._cfg.whatsapp_destination
 
     # -- public API -------------------------------------------------------
 
@@ -134,8 +147,9 @@ class MonitorService:
         """Send a WhatsApp test message. Does NOT touch alert_triggered."""
         session = self._session_factory()
         try:
+            settings_row = repo.get_settings(session)
             state = repo.get_state(session)
-            client = self._evolution_client()
+            client = self._evolution_client(settings_row)
             if client is None:
                 repo.add_event(
                     session,
@@ -147,7 +161,7 @@ class MonitorService:
                 raise EvolutionError("Evolution API not configured")
             try:
                 client.send_text(
-                    self._cfg.whatsapp_destination,
+                    self._effective_destination(settings_row),
                     "✅ OpenRouter Credit Monitor\n\nMensagem de teste enviada com sucesso.",
                 )
             except EvolutionError:
@@ -181,7 +195,7 @@ class MonitorService:
                     EventType.OPENROUTER_ERROR,
                     message=str(exc),
                 )
-                self._refresh_evolution_status(state)
+                self._refresh_evolution_status(state, settings_row)
                 session.commit()
                 logger.warning("openrouter check failed: %s", exc)
                 return CheckResult(ran=True, detail="openrouter_error")
@@ -199,15 +213,15 @@ class MonitorService:
                 message=f"balance {format_usd(balance)}",
             )
 
-            self._refresh_evolution_status(state)
+            self._refresh_evolution_status(state, settings_row)
             self._apply_decision(session, settings_row, state, balance)
             session.commit()
             return CheckResult(ran=True, detail="ok")
         finally:
             session.close()
 
-    def _refresh_evolution_status(self, state) -> None:
-        client = self._evolution_client()
+    def _refresh_evolution_status(self, state, settings_row=None) -> None:
+        client = self._evolution_client(settings_row)
         if client is None:
             state.evolution_status = EvolutionStatus.UNKNOWN
             return
@@ -246,14 +260,14 @@ class MonitorService:
         if state.next_retry_at is not None and now < state.next_retry_at:
             return
 
-        client = self._evolution_client()
+        client = self._evolution_client(settings_row)
         if client is None:
             self._record_send_failure(session, state, now, "Evolution API not configured")
             return
 
         text = self._format_alert(balance, settings_row.alert_threshold)
         try:
-            client.send_text(self._cfg.whatsapp_destination, text)
+            client.send_text(self._effective_destination(settings_row), text)
         except EvolutionError as exc:
             self._record_send_failure(session, state, now, str(exc))
             return

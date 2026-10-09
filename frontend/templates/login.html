@@ -1,15 +1,24 @@
 {% extends "base.html" %}
-{% block content %}
-<section class="card login-card">
-  <h1>{{ app_title }}</h1>
-  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-  <form method="post" action="{{ url_for('login_submit') }}" class="login-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label for="username">Usuário</label>
-    <input type="text" id="username" name="username" autocomplete="username" required>
-    <label for="password">Senha</label>
-    <input type="password" id="password" name="password" autocomplete="current-password" required>
-    <button type="submit" class="btn primary">Entrar</button>
-  </form>
-</section>
+{% block body %}
+<div class="login-screen">
+  <div class="card login-card">
+    <div class="login-brand">
+      <span class="brand-dot status-normal"></span>
+      <span class="brand-name">{{ app_title }}</span>
+    </div>
+    {% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('login_submit') }}" class="login-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Senha</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn primary full">Entrar</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

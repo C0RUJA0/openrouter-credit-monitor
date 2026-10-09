@@ -25,6 +25,10 @@ async def update_settings(
     notifications_enabled: str = Form(None),
     check_interval_seconds: str = Form(None),
     openrouter_key: str = Form(None),
+    evolution_api_url: str = Form(None),
+    evolution_api_key: str = Form(None),
+    evolution_instance: str = Form(None),
+    whatsapp_destination: str = Form(None),
     csrf_token: str = Form(""),
 ):
     if not is_authenticated(request):
@@ -77,6 +81,24 @@ async def update_settings(
             elif submitted:
                 settings_row.openrouter_key = submitted
                 key_changed = True
+
+        # Evolution plain fields: pre-filled in the form, so an empty value
+        # clears the override (fall back to env); a value sets it.
+        for field_name, submitted in (
+            ("evolution_api_url", evolution_api_url),
+            ("evolution_instance", evolution_instance),
+            ("whatsapp_destination", whatsapp_destination),
+        ):
+            if submitted is not None:
+                setattr(settings_row, field_name, submitted.strip() or None)
+
+        # Evolution API key: write-only like the OpenRouter key.
+        if evolution_api_key is not None:
+            ek = evolution_api_key.strip()
+            if ek == "-":
+                settings_row.evolution_api_key = None
+            elif ek:
+                settings_row.evolution_api_key = ek
 
         repo.add_event(
             session,
