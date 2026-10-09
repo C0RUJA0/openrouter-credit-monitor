@@ -1,9 +1,27 @@
 # ERRORS_TODO — pendências para resolver depois
 
-Nenhum erro bloqueante. Suíte de testes: **44 passando**. App sobe, lifespan OK,
+Nenhum erro bloqueante. Suíte de testes: **55 passando**. App sobe, lifespan OK,
 endpoints OK, path prefix OK. Os itens abaixo são validações que dependem de
 ambiente real (rede/serviços externos/Docker) e não puderam ser confirmados
 nesta máquina. Tratar como tasks.
+
+## Resolvido (hardening Fase 2)
+- Guard de produção: `APP_ENV=production` recusa subir com auth desabilitada,
+  `SESSION_SECRET` fraco/default ou `ADMIN_PASSWORD_HASH` inválido
+  (`config.py:validate_runtime`, testes em `test_config_guard.py`).
+- Porta interna configurável via `APP_PORT` (Dockerfile honra `${APP_PORT}`).
+- Build mais reproduzível: deps diretas pinadas (`==`) + base `bookworm`.
+- Persistência SQLite via **volume nomeado** (escrita OK sob não-root).
+- `.dockerignore` reforçado (sem `tests/`, `.env.example`, `*.md`).
+- `/readyz` usa `scheduler.running` público (sem acesso a atributo privado).
+- Smoke test de boot real (`test_app_smoke.py`): `/healthz`, `/readyz`, `/`, static.
+
+## Pendências que exigem ambiente externo (BLOQUEIOS)
+- **Docker não disponível nesta máquina** → `docker build`/compose, healthcheck
+  real, volume e lock transitivo (`pip freeze` dentro da imagem 3.12) não
+  validados. Rodar `docker compose up --build -d` onde houver Docker.
+- **Publicação GitHub** → `gh` logado aqui é conta diferente da do projeto;
+  precisa de autorização explícita e destino do repositório antes do push.
 
 ## 1. Confirmar contrato real da OpenRouter Credits API
 - **O quê:** o adapter assume resposta `{"data": {"total_credits": X, "total_usage": Y}}`
