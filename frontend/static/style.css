@@ -154,8 +154,10 @@ input:focus-visible, textarea:focus-visible { outline: none; border-color: var(-
   background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
   cursor: pointer; font-size: 16px; line-height: 1; transition: color .15s, border-color .15s; }
 .dest-del:hover { color: var(--red); border-color: var(--red); }
-.btn.small { padding: 7px 12px; font-size: 12px; align-self: flex-start; background: transparent; }
+.dest-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.small { padding: 7px 12px; font-size: 12px; background: transparent; }
 .btn.small:hover { border-color: var(--violet); background: var(--surface-2); }
+.btn.small:disabled { opacity: .6; cursor: default; }
 
 .tag { font-size: 9.5px; letter-spacing: .3px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
 .tag-on { background: rgba(53,208,186,.14); color: var(--teal); }

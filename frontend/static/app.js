@@ -16,9 +16,9 @@
     try { return JSON.parse(el.textContent) || fallback; } catch (e) { return fallback; }
   };
 
-  const groups = readJSON("wa-groups", []);      // [{id, name}]
+  let groups = readJSON("wa-groups", []);         // [{id, name}]
   const targets = readJSON("wa-targets", []);     // ["55...", "123@g.us", ...]
-  const groupById = new Map(groups.map((g) => [g.id, g.name]));
+  let groupById = new Map(groups.map((g) => [g.id, g.name]));
   const isGroupId = (v) => typeof v === "string" && v.endsWith("@g.us");
 
   function groupOptions(selected) {
@@ -96,6 +96,40 @@
   sync();
 
   addBtn.addEventListener("click", () => { list.appendChild(makeRow("number", "")); sync(); });
+
+  // Refresh the group list from Evolution without reloading the page, so groups
+  // joined after login show up. Preserves each row's current selection.
+  const refreshBtn = document.getElementById("dest-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      const url = refreshBtn.getAttribute("data-groups-url");
+      if (!url) return;
+      refreshBtn.disabled = true;
+      const original = refreshBtn.textContent;
+      refreshBtn.textContent = "⟳ ...";
+      try {
+        const resp = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!resp.ok) throw new Error("http " + resp.status);
+        const fresh = await resp.json();
+        if (Array.isArray(fresh)) {
+          groups = fresh;
+          groupById = new Map(groups.map((g) => [g.id, g.name]));
+          for (const grp of list.querySelectorAll(".dest-group")) {
+            const current = grp.value;
+            grp.innerHTML = groupOptions(current);
+          }
+          sync();
+        }
+        refreshBtn.textContent = `⟳ ${groups.length} grupo(s)`;
+        setTimeout(() => { refreshBtn.textContent = original; }, 2000);
+      } catch (e) {
+        refreshBtn.textContent = "⟳ falhou";
+        setTimeout(() => { refreshBtn.textContent = original; }, 2000);
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    });
+  }
 
   // Safety: make sure the hidden field is current before any form submit.
   const form = hidden.closest("form");

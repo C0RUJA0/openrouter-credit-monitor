@@ -5,7 +5,7 @@ import base64
 import binascii
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from app.deps import is_authenticated, validate_csrf
@@ -46,6 +46,17 @@ async def whatsapp_qr(request: Request):
         return _svg_note("QR inválido")
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "no-store"})
+
+
+@router.get("/actions/whatsapp/groups", name="whatsapp_groups")
+async def whatsapp_groups(request: Request):
+    """Return the current WhatsApp groups as JSON for the destination selector.
+    Lets the UI refresh the group list without a full page reload."""
+    if not is_authenticated(request):
+        return JSONResponse([], status_code=401)
+    rt = get_runtime()
+    groups = await run_in_threadpool(rt.monitor.list_whatsapp_groups)
+    return JSONResponse(groups, headers={"Cache-Control": "no-store"})
 
 
 def _guard(request: Request, csrf_token: str) -> RedirectResponse | None:

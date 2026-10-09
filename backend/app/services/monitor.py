@@ -220,7 +220,10 @@ class MonitorService:
                 for target in targets:
                     client.send_text(
                         target,
-                        "✅ OpenRouter Credit Monitor\n\nMensagem de teste enviada com sucesso.",
+                        "✅ *OpenRouter Credit Monitor*\n"
+                        "━━━━━━━━━━━━━━━\n"
+                        "Mensagem de teste enviada com sucesso! 🎉\n\n"
+                        "📡 _Integração WhatsApp funcionando._",
                     )
             except EvolutionError:
                 repo.add_event(session, EventType.WHATSAPP_ERROR, message="test send failed")
@@ -372,8 +375,11 @@ class MonitorService:
     @staticmethod
     def _format_alert(balance: Decimal, threshold: Decimal) -> str:
         return (
-            "🚨 OpenRouter — Créditos baixos\n\n"
-            "Seu saldo chegou ao limite configurado.\n\n"
-            f"Saldo atual: {format_usd(balance)}\n"
-            f"Limite: {format_usd(threshold)}"
+            "🚨 *OpenRouter — Créditos baixos* 🚨\n"
+            "━━━━━━━━━━━━━━━\n"
+            "Seu saldo atingiu o limite configurado.\n\n"
+            f"💰 *Saldo atual:*  {format_usd(balance)}\n"
+            f"🎯 *Limite:*  {format_usd(threshold)}\n"
+            "━━━━━━━━━━━━━━━\n"
+            "⚡ _Recarregue para evitar interrupções._"
         )

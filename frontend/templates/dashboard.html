@@ -92,7 +92,11 @@
             <div class="field">
               <label>WhatsApp — destinos</label>
               <div id="dest-list" class="dest-list"></div>
-              <button type="button" class="btn small" id="dest-add">+ Adicionar destino</button>
+              <div class="dest-controls">
+                <button type="button" class="btn small" id="dest-add">+ Adicionar destino</button>
+                <button type="button" class="btn small" id="dest-refresh"
+                        data-groups-url="{{ url_for('whatsapp_groups') }}" title="Atualizar lista de grupos">⟳ grupos</button>
+              </div>
               <input type="hidden" name="whatsapp_destination" id="dest-hidden"
                      value="{{ whatsapp_destination_value }}">
               <script id="wa-groups" type="application/json">{{ whatsapp_groups|tojson }}</script>
