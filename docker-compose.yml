@@ -1,0 +1,48 @@
+services:
+  openrouter-credit-monitor:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: openrouter-credit-monitor
+    restart: unless-stopped
+
+    # Secrets and config come from the per-section env files.
+    env_file:
+      - backend/.env
+      - frontend/.env
+
+    volumes:
+      # Named volume: Docker initializes it from the image path (owned by the
+      # non-root appuser, uid 10001), so SQLite stays writable. A host bind
+      # mount (./data) would be root-owned and break writes under non-root.
+      - monitor-data:/app/data
+
+    # No public host port in production — the Central/reverse proxy reaches this
+    # container over the shared Docker network. Use `expose`, not `ports`.
+    expose:
+      - "8080"
+
+    # For LOCAL development only, uncomment to reach it directly:
+    # ports:
+    #   - "8080:8080"
+    # And for local dev you may prefer a host bind mount instead of the named
+    # volume above (easier to inspect / back up the .db file):
+    #   volumes:
+    #     - ./data:/app/data
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  monitor-data:
+
+# If the Central/reverse proxy runs in its own compose project, attach this
+# service to that shared external network instead of the default one, e.g.:
+# networks:
+#   default:
+#     name: central-net
+#     external: true

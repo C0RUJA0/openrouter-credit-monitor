@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar">
+  <h1>{{ app_title }}</h1>
+  <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+    <button type="submit" class="link-btn">Sair</button>
+  </form>
+</header>
+
+{% if flash %}
+<div class="flash flash-{{ flash.kind }}">{{ flash.text }}</div>
+{% endif %}
+
+<section class="card balance-card">
+  <div class="label">Saldo atual</div>
+  <div class="balance {{ 'low' if balance_status == 'LOW' else ('unknown' if balance_status == 'UNKNOWN' else 'normal') }}">
+    {{ balance_display }}
+  </div>
+  <div class="status-pill status-{{ balance_status|lower }}">
+    {% if balance_status == 'NORMAL' %}🟢 Normal
+    {% elif balance_status == 'LOW' %}🔴 Baixo
+    {% else %}⚪ Desconhecido{% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Alerta</h2>
+  <form method="post" action="{{ url_for('update_settings') }}" class="settings-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="alert_threshold">Avisar quando o saldo chegar a (US$):</label>
+    <input type="text" inputmode="decimal" id="alert_threshold" name="alert_threshold"
+           value="{{ threshold_input }}" required>
+
+    <label class="toggle">
+      <input type="checkbox" name="notifications_enabled" {{ 'checked' if notifications_enabled }}>
+      Notificações
+    </label>
+
+    <input type="hidden" name="check_interval_seconds" value="{{ check_interval_seconds }}">
+    <button type="submit" class="btn primary">Salvar</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Integrações</h2>
+  <table class="kv">
+    <tr><td>OpenRouter</td><td class="st st-{{ openrouter_status|lower }}">{{ openrouter_status }}</td></tr>
+    <tr><td>WhatsApp</td><td class="st st-{{ evolution_status|lower }}">{{ evolution_status }}</td></tr>
+    <tr><td>Instância</td><td>{{ whatsapp_instance }}</td></tr>
+    <tr><td>Destino</td><td>{{ whatsapp_destination_masked }}</td></tr>
+    <tr><td>Limite atual</td><td>{{ threshold_display }}</td></tr>
+    <tr><td>Última consulta</td><td>{{ last_check_at }}</td></tr>
+    <tr><td>Último sucesso</td><td>{{ last_success_at }}</td></tr>
+    <tr><td>Último alerta</td><td>{{ last_alert_at }}</td></tr>
+  </table>
+
+  <div class="actions">
+    <form method="post" action="{{ url_for('check_now') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn">Verificar agora</button>
+    </form>
+    <form method="post" action="{{ url_for('test_whatsapp') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn">Testar WhatsApp</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Eventos recentes</h2>
+  {% if events %}
+  <table class="events">
+    <thead><tr><th>Quando</th><th>Evento</th><th>Saldo</th><th>Detalhe</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>{{ e.time }}</td>
+        <td>{{ e.type }}</td>
+        <td>{{ e.balance }}</td>
+        <td>{{ e.message }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nenhum evento ainda.</p>
+  {% endif %}
+</section>
+{% endblock %}
