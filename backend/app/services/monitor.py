@@ -9,6 +9,7 @@ an alert for a balance that is still low (spec section 26).
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -34,6 +35,22 @@ class CheckResult:
     def __init__(self, ran: bool, detail: str = "") -> None:
         self.ran = ran
         self.detail = detail
+
+
+def parse_destinations(raw: str | None) -> list[str]:
+    """Split a destination string into individual targets.
+
+    Accepts multiple numbers and/or WhatsApp group IDs (``...@g.us``) separated
+    by comma, semicolon, or newline. Order preserved, duplicates removed.
+    """
+    if not raw:
+        return []
+    out: list[str] = []
+    for part in re.split(r"[,;\n\r]+", raw):
+        target = part.strip()
+        if target and target not in out:
+            out.append(target)
+    return out
 
 
 def _backoff_delay(attempt_count: int) -> int:
@@ -109,6 +126,10 @@ class MonitorService:
             return getattr(settings_row, "whatsapp_destination", None) or self._cfg.whatsapp_destination
         return self._cfg.whatsapp_destination
 
+    def _effective_destinations(self, settings_row=None) -> list[str]:
+        """All send targets (numbers and/or group IDs) for this config."""
+        return parse_destinations(self._effective_destination(settings_row))
+
     # -- public API -------------------------------------------------------
 
     def check_balance(self) -> CheckResult:
@@ -143,6 +164,21 @@ class MonitorService:
         finally:
             self._lock.release()
 
+    def whatsapp_qr(self) -> str | None:
+        """Ensure the instance exists and return its pairing QR (base64 PNG data
+        URI), or None if already connected / no QR. Raises EvolutionError when
+        Evolution is unreachable or not configured."""
+        session = self._session_factory()
+        try:
+            settings_row = repo.get_settings(session)
+            client = self._evolution_client(settings_row)
+            if client is None:
+                raise EvolutionError("Evolution API not configured")
+            client.create_instance()
+            return client.get_qr_base64()
+        finally:
+            session.close()
+
     def send_test_message(self) -> None:
         """Send a WhatsApp test message. Does NOT touch alert_triggered."""
         session = self._session_factory()
@@ -159,17 +195,26 @@ class MonitorService:
                 state.evolution_status = EvolutionStatus.UNKNOWN
                 session.commit()
                 raise EvolutionError("Evolution API not configured")
+            targets = self._effective_destinations(settings_row)
+            if not targets:
+                repo.add_event(session, EventType.WHATSAPP_ERROR, message="no destination configured")
+                session.commit()
+                raise EvolutionError("no destination configured")
             try:
-                client.send_text(
-                    self._effective_destination(settings_row),
-                    "✅ OpenRouter Credit Monitor\n\nMensagem de teste enviada com sucesso.",
-                )
+                for target in targets:
+                    client.send_text(
+                        target,
+                        "✅ OpenRouter Credit Monitor\n\nMensagem de teste enviada com sucesso.",
+                    )
             except EvolutionError:
                 repo.add_event(session, EventType.WHATSAPP_ERROR, message="test send failed")
                 state.evolution_status = EvolutionStatus.ERROR
                 session.commit()
                 raise
-            repo.add_event(session, EventType.WHATSAPP_TEST_SENT, message="test message sent")
+            repo.add_event(
+                session, EventType.WHATSAPP_TEST_SENT,
+                message=f"test message sent to {len(targets)} target(s)",
+            )
             session.commit()
         finally:
             session.close()
@@ -265,9 +310,15 @@ class MonitorService:
             self._record_send_failure(session, state, now, "Evolution API not configured")
             return
 
+        targets = self._effective_destinations(settings_row)
+        if not targets:
+            self._record_send_failure(session, state, now, "no destination configured")
+            return
+
         text = self._format_alert(balance, settings_row.alert_threshold)
         try:
-            client.send_text(self._effective_destination(settings_row), text)
+            for target in targets:
+                client.send_text(target, text)
         except EvolutionError as exc:
             self._record_send_failure(session, state, now, str(exc))
             return

@@ -86,7 +86,9 @@ class Settings:
     # Evolution API
     evolution_api_url: str | None = field(default_factory=lambda: _get("EVOLUTION_API_URL"))
     evolution_api_key: str | None = field(default_factory=lambda: _get("EVOLUTION_API_KEY"))
-    evolution_instance: str | None = field(default_factory=lambda: _get("EVOLUTION_INSTANCE"))
+    evolution_instance: str | None = field(
+        default_factory=lambda: _get("EVOLUTION_INSTANCE", "openrouter-monitor")
+    )
     whatsapp_destination: str | None = field(default_factory=lambda: _get("WHATSAPP_DESTINATION"))
 
     # Admin auth

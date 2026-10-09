@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+{% block head %}
+{% if evolution_available and not evolution_connected %}
+<meta http-equiv="refresh" content="8">
+{% endif %}
+{% endblock %}
 {% block body %}
 <div class="app">
 
@@ -6,14 +11,6 @@
     <div class="brand">
       <span class="brand-dot status-{{ balance_status|lower }}"></span>
       <span class="brand-name">{{ app_title }}</span>
-    </div>
-    <div class="pills">
-      <span class="pill st-{{ openrouter_status|lower }}">
-        <i></i>OpenRouter · {{ openrouter_status }}
-      </span>
-      <span class="pill st-{{ evolution_status|lower }}">
-        <i></i>WhatsApp · {{ evolution_status }}
-      </span>
     </div>
     <form method="post" action="{{ url_for('logout') }}" class="appbar-logout">
       <button type="submit" class="ghost-btn">Sair</button>
@@ -24,138 +21,129 @@
   <div class="flash flash-{{ flash.kind }}" role="status">{{ flash.text }}</div>
   {% endif %}
 
-  <main class="grid">
+  <main class="bento">
 
-    <!-- LEFT: balance gauge + actions -->
-    <section class="col left">
-      <div class="card hero">
-        <div class="hero-label">Saldo atual</div>
-        <div class="readout readout-{{ balance_status|lower }}">{{ balance_display }}</div>
-
-        <div class="meter" aria-hidden="true">
-          <div class="meter-fill meter-{{ balance_status|lower }}" style="width: {{ gauge_pct }}%"></div>
-          <div class="meter-tick" style="left: {{ gauge_threshold_pct }}%"></div>
-        </div>
-        <div class="meter-legend">
-          <span>{{ balance_status_label if balance_status_label else (
-            'Normal' if balance_status == 'NORMAL' else (
-            'Abaixo do limite' if balance_status == 'LOW' else 'Sem leitura')) }}</span>
-          <span class="muted">limite {{ threshold_display }}</span>
-        </div>
-
-        <dl class="stat-strip">
-          <div><dt>Última consulta</dt><dd>{{ last_check_at }}</dd></div>
-          <div><dt>Último sucesso</dt><dd>{{ last_success_at }}</dd></div>
-          <div><dt>Último alerta</dt><dd>{{ last_alert_at }}</dd></div>
-        </dl>
-
-        <div class="actions">
-          <form method="post" action="{{ url_for('check_now') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn">Verificar agora</button>
-          </form>
-          <form method="post" action="{{ url_for('test_whatsapp') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn">Testar WhatsApp</button>
-          </form>
-        </div>
+    <!-- SALDO -->
+    <section class="card saldo">
+      <div class="card-label">Saldo atual</div>
+      <div class="readout readout-{{ balance_status|lower }}">{{ balance_display }}</div>
+      <div class="meter" aria-hidden="true">
+        <div class="meter-fill meter-{{ balance_status|lower }}" style="width: {{ gauge_pct }}%"></div>
+        <div class="meter-tick" style="left: {{ gauge_threshold_pct }}%"></div>
+      </div>
+      <div class="meter-legend">
+        <span>{% if balance_status == 'NORMAL' %}Normal{% elif balance_status == 'LOW' %}Abaixo do limite{% else %}Sem leitura{% endif %}</span>
+        <span class="muted">limite {{ threshold_display }}</span>
       </div>
     </section>
 
-    <!-- RIGHT: config (scrolls) + events (scrolls) -->
-    <section class="col right">
+    <!-- STATUS -->
+    <section class="card status">
+      <div class="card-label">Status</div>
+      <ul class="status-list">
+        <li><span class="st-dot st-{{ openrouter_status|lower }}"></span>OpenRouter<span class="st-val">{{ openrouter_status }}</span></li>
+        <li><span class="st-dot st-{{ evolution_status|lower }}"></span>WhatsApp<span class="st-val">{{ evolution_status }}</span></li>
+      </ul>
+      <dl class="mini-strip">
+        <div><dt>Consulta</dt><dd>{{ last_check_at }}</dd></div>
+        <div><dt>Sucesso</dt><dd>{{ last_success_at }}</dd></div>
+        <div><dt>Alerta</dt><dd>{{ last_alert_at }}</dd></div>
+      </dl>
+    </section>
 
-      <form method="post" action="{{ url_for('update_settings') }}" class="card config">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <!-- One settings form spans ALERTA + CHAVES via display:contents -->
+    <form method="post" action="{{ url_for('update_settings') }}" class="settings-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <div class="config-scroll">
-          <h2 class="group-title">Alerta</h2>
-          <div class="field">
-            <label for="alert_threshold">Avisar quando o saldo chegar a (US$)</label>
-            <input type="text" inputmode="decimal" id="alert_threshold" name="alert_threshold"
-                   value="{{ threshold_input }}" required>
+      <!-- ALERTA -->
+      <section class="card alerta">
+        <div class="card-label">Alerta</div>
+        <div class="field">
+          <label for="alert_threshold">Avisar ao chegar em (US$)</label>
+          <input type="text" inputmode="decimal" id="alert_threshold" name="alert_threshold"
+                 value="{{ threshold_input }}" required>
+        </div>
+        <div class="field-row">
+          <label class="switch">
+            <input type="checkbox" name="notifications_enabled" {{ 'checked' if notifications_enabled }}>
+            <span class="track"></span> Notificações
+          </label>
+          <div class="field compact">
+            <label for="check_interval_seconds">Intervalo (s)</label>
+            <input type="number" inputmode="numeric" min="60" step="1"
+                   id="check_interval_seconds" name="check_interval_seconds"
+                   value="{{ check_interval_seconds }}" required>
           </div>
-          <div class="field-row">
-            <label class="switch">
-              <input type="checkbox" name="notifications_enabled" {{ 'checked' if notifications_enabled }}>
-              <span class="track"></span> Notificações
-            </label>
-            <div class="field compact">
-              <label for="check_interval_seconds">Intervalo (s)</label>
-              <input type="number" inputmode="numeric" min="60" step="1"
-                     id="check_interval_seconds" name="check_interval_seconds"
-                     value="{{ check_interval_seconds }}" required>
-            </div>
-          </div>
+        </div>
+      </section>
 
-          <h2 class="group-title">OpenRouter
-            <span class="tag tag-{{ 'on' if openrouter_key_set else 'off' }}">
-              {{ ('definida · ' ~ openrouter_key_source) if openrouter_key_set else 'não definida' }}
-            </span>
-          </h2>
-          <div class="field">
-            <label for="openrouter_key">Chave {% if openrouter_key_set %}<span class="muted">({{ openrouter_key_masked }})</span>{% endif %}</label>
-            <input type="password" id="openrouter_key" name="openrouter_key" autocomplete="off"
-                   placeholder="vazio = manter · '-' = remover">
-          </div>
-
-          <h2 class="group-title">WhatsApp (Evolution)
-            <span class="tag tag-{{ 'on' if evolution_key_set else 'off' }}">
-              {{ ('chave · ' ~ evolution_key_source) if evolution_key_set else 'sem chave' }}
-            </span>
-          </h2>
-          <div class="field">
-            <label for="evolution_api_url">URL da API</label>
-            <input type="text" id="evolution_api_url" name="evolution_api_url"
-                   value="{{ evolution_url }}" placeholder="http://evolution-api:8080" autocomplete="off">
-          </div>
-          <div class="field-row">
+      <!-- CHAVES / INTEGRAÇÕES -->
+      <section class="card chaves">
+        <div class="card-label">Chaves & integrações</div>
+        <div class="chaves-body">
+          <div class="chaves-fields">
             <div class="field">
-              <label for="evolution_instance">Instância</label>
-              <input type="text" id="evolution_instance" name="evolution_instance"
-                     value="{{ evolution_instance_value }}" autocomplete="off">
+              <label for="openrouter_key">Chave OpenRouter
+                <span class="tag tag-{{ 'on' if openrouter_key_set else 'off' }}">{{ (openrouter_key_masked ~ ' · ' ~ openrouter_key_source) if openrouter_key_set else 'não definida' }}</span>
+              </label>
+              <input type="password" id="openrouter_key" name="openrouter_key" autocomplete="off"
+                     placeholder="vazio = manter · '-' = remover">
             </div>
             <div class="field">
-              <label for="whatsapp_destination">Destino (número)</label>
-              <input type="text" id="whatsapp_destination" name="whatsapp_destination"
-                     value="{{ whatsapp_destination_value }}" placeholder="55XXXXXXXXXXX" autocomplete="off">
+              <label for="whatsapp_destination">WhatsApp — destinos
+                {% if whatsapp_target_count %}<span class="tag tag-on">{{ whatsapp_target_count }}</span>{% endif %}
+              </label>
+              <textarea id="whatsapp_destination" name="whatsapp_destination" rows="3"
+                        placeholder="um por linha — número (55XXXXXXXXXXX) ou ID de grupo (...@g.us)"
+                        autocomplete="off">{{ whatsapp_destination_value }}</textarea>
             </div>
           </div>
-          <div class="field">
-            <label for="evolution_api_key">Chave da API {% if evolution_key_set %}<span class="muted">({{ evolution_key_masked }})</span>{% endif %}</label>
-            <input type="password" id="evolution_api_key" name="evolution_api_key" autocomplete="off"
-                   placeholder="vazio = manter · '-' = remover">
+
+          <div class="wa-connect">
+            {% if not evolution_available %}
+              <div class="wa-state off">WhatsApp indisponível. Suba a stack com Evolution.</div>
+            {% elif evolution_connected %}
+              <div class="wa-state ok">● WhatsApp conectado</div>
+              <p class="muted wa-hint">Pronto para enviar alertas. Use “Testar”.</p>
+            {% else %}
+              <div class="wa-qr">
+                <img src="{{ url_for('whatsapp_qr') }}" alt="QR code para parear o WhatsApp" width="150" height="150">
+              </div>
+              <p class="muted wa-hint">Escaneie no WhatsApp → Aparelhos conectados.<br>Atualiza sozinho ao parear.</p>
+            {% endif %}
           </div>
         </div>
 
-        <div class="config-footer">
+        <div class="chaves-actions">
+          <button type="submit" class="btn" formaction="{{ url_for('check_now') }}" formmethod="post" formnovalidate>Verificar</button>
+          <button type="submit" class="btn" formaction="{{ url_for('test_whatsapp') }}" formmethod="post" formnovalidate>Testar</button>
           <button type="submit" class="btn primary">Salvar</button>
         </div>
-      </form>
+      </section>
+    </form>
 
-      <div class="card events">
-        <h2 class="group-title">Eventos recentes</h2>
-        <div class="events-scroll">
-          {% if events %}
-          <table class="events-table">
-            <tbody>
-              {% for e in events %}
-              <tr>
-                <td class="ev-time">{{ e.time }}</td>
-                <td><span class="ev-type ev-{{ e.type|lower }}">{{ e.type }}</span></td>
-                <td class="ev-bal">{{ e.balance }}</td>
-                <td class="ev-msg">{{ e.message }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <p class="empty">Sem eventos ainda. A primeira verificação aparece aqui.</p>
-          {% endif %}
-        </div>
+    <!-- EVENTOS -->
+    <section class="card eventos">
+      <div class="card-label">Eventos recentes</div>
+      <div class="events-body">
+        {% if events %}
+        <table class="events-table">
+          <tbody>
+            {% for e in events %}
+            <tr>
+              <td class="ev-time">{{ e.time }}</td>
+              <td><span class="ev-type ev-{{ e.type|lower }}">{{ e.type }}</span></td>
+              <td class="ev-bal">{{ e.balance }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="empty">Sem eventos ainda.</p>
+        {% endif %}
       </div>
-
     </section>
+
   </main>
 </div>
 {% endblock %}

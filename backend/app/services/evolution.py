@@ -59,6 +59,46 @@ class EvolutionClient:
         if response.status_code not in (200, 201):
             raise EvolutionError(f"unexpected HTTP status {response.status_code}")
 
+    def create_instance(self) -> None:
+        """Create the WhatsApp instance (idempotent). Safe to call repeatedly:
+        an 'already exists' response is treated as success."""
+        body = {
+            "instanceName": self._instance,
+            "integration": "WHATSAPP-BAILEYS",
+            "qrcode": True,
+        }
+        try:
+            with self._client() as client:
+                response = client.post("/instance/create", json=body)
+        except httpx.HTTPError as exc:
+            raise EvolutionError(f"request failed: {type(exc).__name__}") from exc
+        # 200/201 created; 403/409 usually means it already exists — not fatal.
+        if response.status_code not in (200, 201, 403, 409):
+            raise EvolutionError(f"unexpected HTTP status {response.status_code}")
+
+    def get_qr_base64(self) -> str | None:
+        """Return the pairing QR as a base64 PNG data URI, or None if already
+        connected / no QR available. Connect endpoint returns the current QR."""
+        path = f"/instance/connect/{self._instance}"
+        try:
+            with self._client() as client:
+                response = client.get(path)
+        except httpx.HTTPError as exc:
+            raise EvolutionError(f"request failed: {type(exc).__name__}") from exc
+        if response.status_code not in (200, 201):
+            raise EvolutionError(f"unexpected HTTP status {response.status_code}")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise EvolutionError("invalid JSON response") from exc
+        if not isinstance(payload, dict):
+            return None
+        # Evolution v2 may return {"base64": "..."} or nest it under "qrcode".
+        b64 = payload.get("base64")
+        if not b64 and isinstance(payload.get("qrcode"), dict):
+            b64 = payload["qrcode"].get("base64")
+        return b64 or None
+
     def get_instance_status(self) -> str:
         """Return an EvolutionStatus value based on the real instance state.
 

@@ -9,6 +9,7 @@ from app.config import Settings as AppSettings
 from app.db import repository as repo
 from app.events import BalanceStatus, OpenRouterStatus
 from app.money import format_usd
+from app.services.monitor import parse_destinations as _parse_targets
 
 
 def _mask_destination(dest: str | None) -> str:
@@ -94,9 +95,13 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "evolution_url": eff_url or "",
         "evolution_instance_value": eff_instance or "",
         "whatsapp_destination_value": eff_destination or "",
+        "whatsapp_target_count": len(_parse_targets(eff_destination)),
         "evolution_key_set": bool(eff_evo_key),
         "evolution_key_masked": _mask_secret(eff_evo_key),
         "evolution_key_source": "UI" if settings_row.evolution_api_key else "env",
+        # Is Evolution wired up (so we can show the QR flow) and is it paired?
+        "evolution_available": bool(eff_url and eff_evo_key and eff_instance),
+        "evolution_connected": state.evolution_status == "CONNECTED",
         # OpenRouter key: expose only whether it is set and a masked hint.
         # The effective key is the DB override if present, else the env key.
         "openrouter_key_set": bool(settings_row.openrouter_key or config.openrouter_management_key),

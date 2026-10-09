@@ -1,0 +1,112 @@
+# All-in-one stack: the monitor PLUS a self-hosted Evolution API (with its own
+# Postgres + Redis) so WhatsApp works end-to-end on one host.
+#
+# The monitor itself stays a single container — Evolution and its datastores are
+# SEPARATE neighbor services on a shared network (required: Evolution keeps a
+# persistent WhatsApp session you pair by scanning a QR code).
+#
+# Usage:
+#   cp .env.stack.example .env         # fill in the secrets
+#   docker compose -f docker-compose.stack.yml up -d --build
+#
+# Then open the Evolution manager, create an instance, scan the QR with your
+# phone (WhatsApp > Linked devices), and set the Evolution URL/key/instance +
+# destination in the monitor UI. See docs/EVOLUTION_STACK.md.
+
+services:
+  openrouter-credit-monitor:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: openrouter-credit-monitor
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: "8080"
+      ROOT_PATH: ${ROOT_PATH:-}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      LAN_ONLY: ${LAN_ONLY:-false}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OPENROUTER_MANAGEMENT_KEY: ${OPENROUTER_MANAGEMENT_KEY:-}
+      # Point the monitor at the neighbor Evolution service by default.
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution-api:8080}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      WHATSAPP_DESTINATION: ${WHATSAPP_DESTINATION:-}
+      DATABASE_URL: sqlite:////app/data/monitor.db
+    volumes:
+      - monitor-data:/app/data
+    expose:
+      - "8080"
+    depends_on:
+      - evolution-api
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution-api
+    restart: unless-stopped
+    environment:
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?set EVOLUTION_API_KEY in .env}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@evolution-postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution-instances:/evolution/instances
+    expose:
+      - "8080"
+    # For local pairing you may want to reach the Evolution manager directly;
+    # uncomment to publish it on the LAN (keep it off the public internet).
+    # ports:
+    #   - "8088:8080"
+    depends_on:
+      - evolution-postgres
+      - evolution-redis
+
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: evolution-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - evolution-redis:/data
+
+volumes:
+  monitor-data:
+  evolution-instances:
+  evolution-postgres:
+  evolution-redis:

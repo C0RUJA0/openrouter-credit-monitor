@@ -35,7 +35,8 @@ class Settings(Base):
     evolution_api_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     evolution_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     evolution_instance: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    whatsapp_destination: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # One or more targets (numbers and/or group IDs), separated by comma/newline.
+    whatsapp_destination: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
