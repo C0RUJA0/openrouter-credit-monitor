@@ -26,6 +26,10 @@ class Settings(Base):
     alert_threshold: Mapped[Decimal] = mapped_column(DecimalString, nullable=False)
     check_interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Optional UI-set OpenRouter key override (deviation from the env-only
+    # design). When present it takes precedence over OPENROUTER_MANAGEMENT_KEY.
+    # Never returned to the browser or logged; only a masked hint is shown.
+    openrouter_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

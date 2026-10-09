@@ -102,6 +102,11 @@ class Settings:
         default_factory=lambda: _get("COOKIE_SECURE", "false").lower()
         in ("1", "true", "yes", "on")
     )
+    # Restrict access to LAN/private clients only (loopback + RFC1918 + link-local).
+    lan_only: bool = field(
+        default_factory=lambda: _get("LAN_ONLY", "false").lower()
+        in ("1", "true", "yes", "on")
+    )
 
     # Database
     database_url: str = field(

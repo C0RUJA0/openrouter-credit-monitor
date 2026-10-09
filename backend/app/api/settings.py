@@ -24,6 +24,7 @@ async def update_settings(
     alert_threshold: str = Form(...),
     notifications_enabled: str = Form(None),
     check_interval_seconds: str = Form(None),
+    openrouter_key: str = Form(None),
     csrf_token: str = Form(""),
 ):
     if not is_authenticated(request):
@@ -64,6 +65,19 @@ async def update_settings(
         if new_interval is not None:
             settings_row.check_interval_seconds = new_interval
 
+        # Optional OpenRouter key override: write-only. A non-empty value
+        # replaces the stored key; the literal "-" clears it (fall back to env).
+        # The value itself is never logged or echoed back.
+        key_changed = False
+        if openrouter_key is not None:
+            submitted = openrouter_key.strip()
+            if submitted == "-":
+                settings_row.openrouter_key = None
+                key_changed = True
+            elif submitted:
+                settings_row.openrouter_key = submitted
+                key_changed = True
+
         repo.add_event(
             session,
             EventType.SETTINGS_CHANGED,
@@ -75,6 +89,7 @@ async def update_settings(
                 "new_notifications": new_notifications,
                 "old_interval": old_interval,
                 "new_interval": settings_row.check_interval_seconds,
+                "openrouter_key_changed": key_changed,
             },
         )
         session.commit()
@@ -88,8 +103,12 @@ async def update_settings(
         except Exception:  # noqa: BLE001
             logger.exception("failed to reschedule after interval change")
 
-    # Re-evaluate the last known balance once, consistently with current state.
-    await run_in_threadpool(rt.monitor.reevaluate_now)
+    # If the key changed, run a real check so the UI reflects the new key's
+    # status immediately; otherwise just re-evaluate the last known balance.
+    if key_changed:
+        await run_in_threadpool(rt.monitor.check_balance)
+    else:
+        await run_in_threadpool(rt.monitor.reevaluate_now)
 
     request.session["flash"] = {"kind": "ok", "text": "Configurações salvas."}
     return RedirectResponse(url=str(request.url_for("dashboard_page")), status_code=303)

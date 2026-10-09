@@ -18,6 +18,14 @@ def _mask_destination(dest: str | None) -> str:
     return "*" * max(len(dest) - 4, 0) + tail
 
 
+def _mask_secret(value: str | None) -> str:
+    """Show only the last 4 chars; never the full secret."""
+    if not value:
+        return "—"
+    tail = value[-4:]
+    return "•" * max(min(len(value) - 4, 8), 0) + tail
+
+
 def _fmt_dt(dt) -> str:
     if dt is None:
         return "—"
@@ -64,6 +72,13 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "last_alert_at": _fmt_dt(state.last_alert_at),
         "whatsapp_instance": config.evolution_instance or "—",
         "whatsapp_destination_masked": _mask_destination(config.whatsapp_destination),
+        # OpenRouter key: expose only whether it is set and a masked hint.
+        # The effective key is the DB override if present, else the env key.
+        "openrouter_key_set": bool(settings_row.openrouter_key or config.openrouter_management_key),
+        "openrouter_key_masked": _mask_secret(
+            settings_row.openrouter_key or config.openrouter_management_key
+        ),
+        "openrouter_key_source": "UI" if settings_row.openrouter_key else "env",
         "events": event_rows,
         "csrf_token": csrf_token,
     }

@@ -105,6 +105,13 @@ def create_app() -> FastAPI:
         session_cookie="orcm_session",
     )
 
+    # Optional LAN-only guard (added last so it runs first on each request).
+    if cfg.lan_only:
+        from app.netguard import LanOnlyMiddleware
+
+        app.add_middleware(LanOnlyMiddleware)
+        logger.info("LAN-only access guard enabled")
+
     app.mount("/static", StaticFiles(directory=cfg.static_dir), name="static")
 
     app.include_router(health.router)

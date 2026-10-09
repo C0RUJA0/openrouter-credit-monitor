@@ -36,7 +36,20 @@
       Notificações
     </label>
 
-    <input type="hidden" name="check_interval_seconds" value="{{ check_interval_seconds }}">
+    <label for="check_interval_seconds">Intervalo de verificação (segundos, mín. 60):</label>
+    <input type="number" inputmode="numeric" min="60" step="1"
+           id="check_interval_seconds" name="check_interval_seconds"
+           value="{{ check_interval_seconds }}" required>
+
+    <label for="openrouter_key">Chave OpenRouter
+      <small class="muted">
+        ({% if openrouter_key_set %}definida: {{ openrouter_key_masked }} · fonte: {{ openrouter_key_source }}{% else %}não definida{% endif %})
+      </small>
+    </label>
+    <input type="password" id="openrouter_key" name="openrouter_key"
+           autocomplete="off" placeholder="deixe vazio para manter; '-' para remover">
+    <small class="muted">A chave nunca é exibida. Salvar com um novo valor a substitui.</small>
+
     <button type="submit" class="btn primary">Salvar</button>
   </form>
 </section>

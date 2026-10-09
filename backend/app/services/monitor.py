@@ -60,16 +60,23 @@ class MonitorService:
 
     # -- client accessors (lazy build from config) ------------------------
 
-    def _openrouter_client(self) -> OpenRouterClient:
+    def _effective_openrouter_key(self, settings_row) -> str | None:
+        """Prefer the UI-set DB override, else the environment key."""
+        db_key = getattr(settings_row, "openrouter_key", None)
+        if db_key:
+            return db_key
+        return self._cfg.openrouter_management_key
+
+    def _openrouter_client(self, key: str | None = None) -> OpenRouterClient:
         if self._openrouter is not None:
             return self._openrouter
-        if not self._cfg.openrouter_management_key:
+        if not key:
             # Surface as an OpenRouterError so a missing key degrades to the
             # normal error path (UNKNOWN status) instead of crashing a check.
-            raise OpenRouterError("OPENROUTER_MANAGEMENT_KEY not configured")
+            raise OpenRouterError("OpenRouter key not configured")
         return OpenRouterClient(
             self._cfg.openrouter_base_url,
-            self._cfg.openrouter_management_key,
+            key,
             timeout=self._cfg.http_timeout,
         )
 
@@ -164,7 +171,8 @@ class MonitorService:
             state.last_check_at = now
 
             try:
-                credits = self._openrouter_client().get_credits()
+                key = self._effective_openrouter_key(settings_row)
+                credits = self._openrouter_client(key).get_credits()
             except OpenRouterError as exc:
                 # An error is NOT a zero balance. Preserve last known balance.
                 state.openrouter_status = OpenRouterStatus.ERROR
