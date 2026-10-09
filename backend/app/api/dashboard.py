@@ -17,11 +17,21 @@ def dashboard_page(request: Request):
         return RedirectResponse(url=str(request.url_for("login_page")), status_code=303)
 
     csrf = get_or_create_csrf(request)
-    session = get_runtime().session_factory()
+    rt = get_runtime()
+    session = rt.session_factory()
     try:
-        context = build_dashboard_context(session, get_runtime().config, csrf)
+        context = build_dashboard_context(session, rt.config, csrf)
     finally:
         session.close()
+
+    # Groups for the destination selector (best-effort; only when connected).
+    groups = []
+    if context.get("evolution_connected"):
+        try:
+            groups = rt.monitor.list_whatsapp_groups()
+        except Exception:  # noqa: BLE001 - selector is optional, never fatal
+            groups = []
+    context["whatsapp_groups"] = groups
 
     # Surface a one-shot flash message if present.
     context["flash"] = request.session.pop("flash", None)

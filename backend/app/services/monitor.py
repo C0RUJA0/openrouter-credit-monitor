@@ -179,6 +179,22 @@ class MonitorService:
         finally:
             session.close()
 
+    def list_whatsapp_groups(self) -> list[dict]:
+        """Best-effort list of WhatsApp groups for the UI selector. Returns [] if
+        Evolution is unconfigured/unreachable or no instance is connected."""
+        session = self._session_factory()
+        try:
+            settings_row = repo.get_settings(session)
+            client = self._evolution_client(settings_row)
+            if client is None:
+                return []
+            try:
+                return client.fetch_groups()
+            except EvolutionError:
+                return []
+        finally:
+            session.close()
+
     def send_test_message(self) -> None:
         """Send a WhatsApp test message. Does NOT touch alert_triggered."""
         session = self._session_factory()

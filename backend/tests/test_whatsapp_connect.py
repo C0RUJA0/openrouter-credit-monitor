@@ -109,3 +109,31 @@ def test_alert_sends_to_all_targets(app_settings, session_factory):
         s.close()
     m.check_balance()  # 5 <= 10 -> alert to all
     assert sorted(evo.sent) == ["5511", "5521"]
+
+
+def test_fetch_groups_parses_list():
+    def handler(request):
+        assert "/group/fetchAllGroups/" in request.url.path
+        return httpx.Response(200, json=[
+            {"id": "111@g.us", "subject": "Família"},
+            {"id": "222@g.us", "subject": "Trabalho"},
+            {"id": "", "subject": "sem id"},
+            {"id": "333@g.us"},
+        ])
+    c = EvolutionClient("http://evo", "k", "inst", transport=httpx.MockTransport(handler))
+    groups = c.fetch_groups()
+    assert groups == [
+        {"id": "111@g.us", "name": "Família"},
+        {"id": "222@g.us", "name": "Trabalho"},
+        {"id": "333@g.us", "name": "333@g.us"},
+    ]
+
+
+def test_list_groups_best_effort_empty_on_error(app_settings, session_factory):
+    from app.services.monitor import MonitorService
+
+    class BoomEvo:
+        def fetch_groups(self): raise EvolutionError("down")
+        def get_instance_status(self): return "CONNECTED"
+    m = MonitorService(app_settings, session_factory, evolution_client=BoomEvo())
+    assert m.list_whatsapp_groups() == []

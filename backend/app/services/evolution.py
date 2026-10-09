@@ -99,6 +99,34 @@ class EvolutionClient:
             b64 = payload["qrcode"].get("base64")
         return b64 or None
 
+    def fetch_groups(self) -> list[dict]:
+        """List WhatsApp groups as [{'id': '<jid>', 'name': '<subject>'}].
+
+        Requires a connected instance. Raises EvolutionError on failure.
+        """
+        path = f"/group/fetchAllGroups/{self._instance}?getParticipants=false"
+        try:
+            with self._client() as client:
+                response = client.get(path)
+        except httpx.HTTPError as exc:
+            raise EvolutionError(f"request failed: {type(exc).__name__}") from exc
+        if response.status_code != 200:
+            raise EvolutionError(f"unexpected HTTP status {response.status_code}")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise EvolutionError("invalid JSON response") from exc
+        groups = payload if isinstance(payload, list) else payload.get("groups", [])
+        out: list[dict] = []
+        for g in groups or []:
+            if not isinstance(g, dict):
+                continue
+            gid = g.get("id")
+            if not gid:
+                continue
+            out.append({"id": gid, "name": g.get("subject") or gid})
+        return out
+
     def get_instance_status(self) -> str:
         """Return an EvolutionStatus value based on the real instance state.
 

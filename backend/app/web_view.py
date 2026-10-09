@@ -95,7 +95,7 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "evolution_url": eff_url or "",
         "evolution_instance_value": eff_instance or "",
         "whatsapp_destination_value": eff_destination or "",
-        "whatsapp_target_count": len(_parse_targets(eff_destination)),
+        "whatsapp_targets": _parse_targets(eff_destination),
         "evolution_key_set": bool(eff_evo_key),
         "evolution_key_masked": _mask_secret(eff_evo_key),
         "evolution_key_source": "UI" if settings_row.evolution_api_key else "env",

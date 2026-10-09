@@ -90,12 +90,13 @@
                      placeholder="vazio = manter · '-' = remover">
             </div>
             <div class="field">
-              <label for="whatsapp_destination">WhatsApp — destinos
-                {% if whatsapp_target_count %}<span class="tag tag-on">{{ whatsapp_target_count }}</span>{% endif %}
-              </label>
-              <textarea id="whatsapp_destination" name="whatsapp_destination" rows="3"
-                        placeholder="um por linha — número (55XXXXXXXXXXX) ou ID de grupo (...@g.us)"
-                        autocomplete="off">{{ whatsapp_destination_value }}</textarea>
+              <label>WhatsApp — destinos</label>
+              <div id="dest-list" class="dest-list"></div>
+              <button type="button" class="btn small" id="dest-add">+ Adicionar destino</button>
+              <input type="hidden" name="whatsapp_destination" id="dest-hidden"
+                     value="{{ whatsapp_destination_value }}">
+              <script id="wa-groups" type="application/json">{{ whatsapp_groups|tojson }}</script>
+              <script id="wa-targets" type="application/json">{{ whatsapp_targets|tojson }}</script>
             </div>
           </div>
 
@@ -146,4 +147,5 @@
 
   </main>
 </div>
+<script src="{{ url_for('static', path='app.js') }}" defer></script>
 {% endblock %}
