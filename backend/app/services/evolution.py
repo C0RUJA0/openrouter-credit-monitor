@@ -127,6 +127,43 @@ class EvolutionClient:
             out.append({"id": gid, "name": g.get("subject") or gid})
         return out
 
+    def last_message_is_from_me(self, jid: str) -> bool | None:
+        """Whether the most recent message in `jid` was sent by this bot.
+
+        Returns True/False, or None when it can't be determined (no messages,
+        error, or unexpected shape) — callers treat None as "don't suppress".
+        """
+        path = f"/chat/findMessages/{self._instance}"
+        body = {"where": {"key": {"remoteJid": jid}}}
+        try:
+            with self._client() as client:
+                response = client.post(path, json=body)
+        except httpx.HTTPError:
+            return None
+        if response.status_code not in (200, 201):
+            return None
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        records = None
+        if isinstance(payload, list):
+            records = payload
+        elif isinstance(payload, dict):
+            msgs = payload.get("messages")
+            if isinstance(msgs, dict):
+                records = msgs.get("records")
+            elif isinstance(msgs, list):
+                records = msgs
+        if not records:
+            return None
+        try:
+            latest = max(records, key=lambda r: r.get("messageTimestamp", 0) or 0)
+            from_me = (latest.get("key") or {}).get("fromMe")
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return bool(from_me) if from_me is not None else None
+
     def get_instance_status(self) -> str:
         """Return an EvolutionStatus value based on the real instance state.
 

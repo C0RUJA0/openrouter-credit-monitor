@@ -64,3 +64,12 @@ nesta máquina. Tratar como tasks.
   valor atual num hidden; não há input editável de intervalo na UI (v1 prioriza
   o limite monetário, conforme spec §28).
 - **Ação (opcional):** expor input de intervalo no template se desejado.
+
+## 7. Validar contrato do findMessages (anti-spam de grupo)
+- **O quê:** `last_message_is_from_me()` usa `POST /chat/findMessages/{instance}`
+  com `{"where":{"key":{"remoteJid":jid}}}` e lê `records[].key.fromMe` +
+  `messageTimestamp`. Shape pode variar por versão da Evolution.
+- **Risco:** se o shape diferir, retorna None → fail-open (envia mesmo assim),
+  nunca suprime alerta por engano. Seguro, mas o anti-spam pode não ativar.
+- **Ação:** conferir o JSON real contra a Evolution instalada (v2.3.7) e ajustar
+  só o parse em `backend/app/services/evolution.py` se preciso.

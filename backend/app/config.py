@@ -136,6 +136,12 @@ class Settings:
     alert_reminder_gap_seconds: int = field(
         default_factory=lambda: int(_get("ALERT_REMINDER_GAP_SECONDS", "21600"))
     )
+    # For GROUP targets: skip sending if the bot's message is already the last
+    # one in the group (avoid stacking consecutive bot messages). Fail-open.
+    group_antispam_check: bool = field(
+        default_factory=lambda: _get("GROUP_ANTISPAM", "true").lower()
+        in ("1", "true", "yes", "on")
+    )
 
     def require_openrouter(self) -> None:
         """Validate required OpenRouter credential exists without printing it."""

@@ -130,6 +130,24 @@ class MonitorService:
         """All send targets (numbers and/or group IDs) for this config."""
         return parse_destinations(self._effective_destination(settings_row))
 
+    def _filter_group_antispam(self, client, targets: list[str]) -> list[str]:
+        """Drop group targets whose last message is already the bot's own, to
+        avoid stacking consecutive bot messages. Fail-open: on None/error keep
+        the target. Numbers are never filtered."""
+        if not self._cfg.group_antispam_check:
+            return targets
+        out: list[str] = []
+        for t in targets:
+            if t.endswith("@g.us"):
+                try:
+                    if client.last_message_is_from_me(t) is True:
+                        logger.info("group %s: bot is last message, skipping", t)
+                        continue
+                except EvolutionError:
+                    pass  # fail-open: send anyway
+            out.append(t)
+        return out
+
     # -- public API -------------------------------------------------------
 
     def check_balance(self) -> CheckResult:
@@ -370,6 +388,12 @@ class MonitorService:
         targets = self._effective_destinations(settings_row)
         if not targets:
             self._record_send_failure(session, state, now, "no destination configured")
+            return
+
+        # Group anti-spam: drop groups where the bot is already the last message.
+        targets = self._filter_group_antispam(client, targets)
+        if not targets:
+            logger.info("all targets suppressed by group anti-spam; skipping send")
             return
 
         text = self._format_alert(balance, settings_row.alert_threshold)
