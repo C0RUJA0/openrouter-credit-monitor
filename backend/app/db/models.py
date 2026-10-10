@@ -58,6 +58,10 @@ class MonitorState(Base):
     # Anti-spam backoff bookkeeping for failed WhatsApp sends.
     alert_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Daily reminder cap: how many alerts sent in the current 24h window, and when
+    # that window started. Lets a low balance remind up to N times/day (not once).
+    alert_window_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    alert_sends_in_window: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 

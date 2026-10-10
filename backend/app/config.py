@@ -127,6 +127,16 @@ class Settings:
     # Event retention
     event_retention_days: int = 30
 
+    # Alert reminders: while the balance stays below the threshold, re-send the
+    # alert up to N times per rolling 24h window, spaced at least this many
+    # seconds apart. Resets when balance recovers above the threshold.
+    alert_max_per_day: int = field(
+        default_factory=lambda: int(_get("ALERT_MAX_PER_DAY", "2"))
+    )
+    alert_reminder_gap_seconds: int = field(
+        default_factory=lambda: int(_get("ALERT_REMINDER_GAP_SECONDS", "21600"))
+    )
+
     def require_openrouter(self) -> None:
         """Validate required OpenRouter credential exists without printing it."""
         if not self.openrouter_management_key:

@@ -21,7 +21,11 @@ _ADDED_COLUMNS = {
         "evolution_api_url": "VARCHAR(512)",
         "evolution_api_key": "VARCHAR(256)",
         "evolution_instance": "VARCHAR(128)",
-        "whatsapp_destination": "VARCHAR(32)",
+        "whatsapp_destination": "VARCHAR(1024)",
+    },
+    "monitor_state": {
+        "alert_window_start": "DATETIME",
+        "alert_sends_in_window": "INTEGER DEFAULT 0",
     },
 }
 

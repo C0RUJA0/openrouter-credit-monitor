@@ -306,6 +306,10 @@ class MonitorService:
             state.alert_triggered = False
             state.alert_attempt_count = 0
             state.next_retry_at = None
+            # Balance recovered above the threshold -> reset the daily reminder
+            # window so the next low episode can alert again.
+            state.alert_window_start = None
+            state.alert_sends_in_window = 0
             repo.add_event(
                 session,
                 EventType.BALANCE_RECOVERED,
@@ -316,7 +320,41 @@ class MonitorService:
             return
 
         if decision.action == AlertAction.SEND_ALERT:
+            # First alert of this low episode — always send (counts as #1/day).
             self._try_send_alert(session, settings_row, state, balance)
+            return
+
+        # Still low and already alerted: send a reminder if under the daily cap
+        # and enough time has passed since the last alert (anti-spam).
+        if (
+            decision.is_low
+            and state.alert_triggered
+            and settings_row.notifications_enabled
+            and self._reminder_allowed(state, self._now())
+        ):
+            self._try_send_alert(session, settings_row, state, balance)
+
+    def _reminder_allowed(self, state, now: datetime) -> bool:
+        """True if a reminder may be sent now: under the daily cap AND spaced far
+        enough from the last alert. A stale (>24h) window counts as reset."""
+        count = state.alert_sends_in_window or 0
+        if state.alert_window_start is not None and \
+                (now - state.alert_window_start).total_seconds() >= 86400:
+            count = 0
+        if count >= self._cfg.alert_max_per_day:
+            return False
+        if state.last_alert_at is not None and \
+                (now - state.last_alert_at).total_seconds() < self._cfg.alert_reminder_gap_seconds:
+            return False
+        return True
+
+    def _record_alert_send(self, state, now: datetime) -> None:
+        """Account one successful alert send against the rolling 24h window."""
+        if state.alert_window_start is None or \
+                (now - state.alert_window_start).total_seconds() >= 86400:
+            state.alert_window_start = now
+            state.alert_sends_in_window = 0
+        state.alert_sends_in_window = (state.alert_sends_in_window or 0) + 1
 
     def _try_send_alert(self, session, settings_row, state, balance: Decimal) -> None:
         now = self._now()
@@ -349,11 +387,13 @@ class MonitorService:
         state.alert_attempt_count = 0
         state.next_retry_at = None
         state.evolution_status = EvolutionStatus.CONNECTED
+        self._record_alert_send(state, now)
         repo.add_event(
             session,
             EventType.ALERT_SENT,
             balance=balance,
-            message=f"alert sent at {format_usd(balance)}",
+            message=f"alert sent at {format_usd(balance)} "
+                    f"({state.alert_sends_in_window}/{self._cfg.alert_max_per_day} today)",
         )
 
     def _record_send_failure(self, session, state, now: datetime, detail: str) -> None:
