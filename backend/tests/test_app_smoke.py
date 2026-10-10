@@ -81,7 +81,8 @@ def test_settings_updates_key_without_echoing_it(client):
         "/settings",
         data={
             "alert_threshold": "10.00",
-            "check_interval_seconds": "120",
+            "interval_value": "2",
+            "interval_unit": "min",
             "openrouter_key": "sk-or-secret-abc-7788",
             "csrf_token": token,
         },
@@ -92,5 +93,6 @@ def test_settings_updates_key_without_echoing_it(client):
     assert "sk-or-secret-abc-7788" not in r.text
     # masked hint (last 4) should be visible
     assert "7788" in r.text
-    # interval change took effect
-    assert 'value="120"' in r.text
+    # interval 2 min = 120s, displayed back as value 2 + minutes selected
+    assert 'value="2"' in r.text
+    assert '<option value="min"  selected>minutos</option>' in r.text

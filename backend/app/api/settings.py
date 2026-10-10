@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from app.db import repository as repo
 from app.deps import is_authenticated, validate_csrf
 from app.events import EventType
+from app.intervals import to_seconds
 from app.money import format_usd, parse_money
 from app.runtime import get_runtime
 
@@ -24,6 +25,8 @@ async def update_settings(
     alert_threshold: str = Form(...),
     notifications_enabled: str = Form(None),
     check_interval_seconds: str = Form(None),
+    interval_value: str = Form(None),
+    interval_unit: str = Form(None),
     openrouter_key: str = Form(None),
     evolution_api_url: str = Form(None),
     evolution_api_key: str = Form(None),
@@ -48,14 +51,21 @@ async def update_settings(
 
     new_notifications = notifications_enabled is not None
 
+    # Interval: prefer value+unit (new UI); fall back to raw seconds (API compat).
     new_interval = None
-    if check_interval_seconds:
+    raw_seconds = None
+    if interval_value:
         try:
-            new_interval = int(check_interval_seconds)
+            raw_seconds = to_seconds(int(interval_value), interval_unit or "seg")
         except ValueError:
-            new_interval = None
-        if new_interval is not None and new_interval < cfg.min_check_interval_seconds:
-            new_interval = cfg.min_check_interval_seconds
+            raw_seconds = None
+    elif check_interval_seconds:
+        try:
+            raw_seconds = int(check_interval_seconds)
+        except ValueError:
+            raw_seconds = None
+    if raw_seconds is not None:
+        new_interval = max(raw_seconds, cfg.min_check_interval_seconds)
 
     session = rt.session_factory()
     try:

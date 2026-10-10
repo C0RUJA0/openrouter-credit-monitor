@@ -124,7 +124,12 @@ body {
 .alerta .field { margin-bottom: 11px; }
 .field label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .field.compact { width: 108px; }
-.field-row { display: flex; gap: 12px; align-items: flex-end; }
+.field-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.interval-row { display: flex; gap: 8px; }
+.interval-row input { flex: 1; min-width: 0; }
+.interval-row select { flex: 0 0 auto; font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 10px; }
+.interval-row select:focus-visible { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,108,240,.25); }
 input[type="text"], input[type="password"], input[type="number"], textarea {
   width: 100%; font: inherit; color: var(--text); background: var(--bg);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 11px;

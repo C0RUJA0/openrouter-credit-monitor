@@ -68,11 +68,21 @@
             <input type="checkbox" name="notifications_enabled" {{ 'checked' if notifications_enabled }}>
             <span class="track"></span> Notificações
           </label>
-          <div class="field compact">
-            <label for="check_interval_seconds">Intervalo (s)</label>
-            <input type="number" inputmode="numeric" min="60" step="1"
-                   id="check_interval_seconds" name="check_interval_seconds"
-                   value="{{ check_interval_seconds }}" required>
+          <div class="field">
+            <label for="interval_value">Intervalo de verificação</label>
+            <div class="interval-row">
+              <input type="number" inputmode="numeric" min="1" step="1"
+                     id="interval_value" name="interval_value"
+                     value="{{ interval_value }}" required>
+              <select name="interval_unit" aria-label="Unidade do intervalo">
+                <option value="seg"  {{ 'selected' if interval_unit == 'seg' }}>segundos</option>
+                <option value="min"  {{ 'selected' if interval_unit == 'min' }}>minutos</option>
+                <option value="h"    {{ 'selected' if interval_unit == 'h' }}>horas</option>
+                <option value="dias" {{ 'selected' if interval_unit == 'dias' }}>dias</option>
+                <option value="sem"  {{ 'selected' if interval_unit == 'sem' }}>semanas</option>
+                <option value="mes"  {{ 'selected' if interval_unit == 'mes' }}>meses</option>
+              </select>
+            </div>
           </div>
         </div>
       </section>

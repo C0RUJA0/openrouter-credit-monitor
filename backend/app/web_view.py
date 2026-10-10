@@ -8,6 +8,7 @@ from __future__ import annotations
 from app.config import Settings as AppSettings
 from app.db import repository as repo
 from app.events import BalanceStatus, OpenRouterStatus
+from app.intervals import split as _split_interval
 from app.money import format_usd
 from app.services.monitor import parse_destinations as _parse_targets
 
@@ -84,6 +85,8 @@ def build_dashboard_context(session, config: AppSettings, csrf_token: str) -> di
         "threshold_input": f"{settings_row.alert_threshold:.2f}",
         "notifications_enabled": settings_row.notifications_enabled,
         "check_interval_seconds": settings_row.check_interval_seconds,
+        "interval_value": _split_interval(settings_row.check_interval_seconds)[0],
+        "interval_unit": _split_interval(settings_row.check_interval_seconds)[1],
         "openrouter_status": state.openrouter_status,
         "evolution_status": state.evolution_status,
         "last_check_at": _fmt_dt(state.last_check_at),
