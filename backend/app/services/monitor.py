@@ -140,11 +140,13 @@ class MonitorService:
         for t in targets:
             if t.endswith("@g.us"):
                 try:
-                    if client.last_message_is_from_me(t) is True:
-                        logger.info("group %s: bot is last message, skipping", t)
-                        continue
+                    last_from_me = client.last_message_is_from_me(t)
                 except EvolutionError:
-                    pass  # fail-open: send anyway
+                    last_from_me = None  # fail-open: send anyway
+                logger.info("group antispam %s: last_from_me=%s", t, last_from_me)
+                if last_from_me is True:
+                    logger.info("group %s: bot is last message, skipping", t)
+                    continue
             out.append(t)
         return out
 

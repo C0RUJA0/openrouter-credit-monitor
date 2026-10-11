@@ -60,10 +60,12 @@ services:
       DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD:-evolution_local_dev}@evolution-postgres:5432/evolution
       DATABASE_CONNECTION_CLIENT_NAME: evolution
       DATABASE_SAVE_DATA_INSTANCE: "true"
-      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
-      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      # Save message history so "is the bot the last message?" (group anti-spam)
+      # is reliable — needs incoming messages persisted, not just our own sends.
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
       DATABASE_SAVE_DATA_CONTACTS: "false"
-      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_CHATS: "true"
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://evolution-redis:6379/6
       CACHE_REDIS_PREFIX_KEY: evolution
